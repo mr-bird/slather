@@ -1,12 +1,15 @@
 module Slather
   module CoverageInfo
-
     def num_lines_tested
       line_coverage_data.compact.select { |cd| cd > 0 }.count
     end
 
     def num_lines_testable
       line_coverage_data.compact.count
+    end
+
+    def num_lines_excluded
+      self.excluded_lines.select { |ln, flag| flag }.count
     end
 
     def rate_lines_tested
@@ -79,6 +82,5 @@ module Slather
         File.fnmatch(ignore, source_file_pathname_relative_to_repo_root)
       end
     end
-
   end
 end

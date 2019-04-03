@@ -1,10 +1,9 @@
-require 'nokogiri'
+require "nokogiri"
 require "cgi"
 
 module Slather
   module CoverageService
     module HtmlOutput
-
       attr_reader :docs
 
       def coverage_file_class
@@ -14,12 +13,14 @@ module Slather
           Slather::CoverageFile
         end
       end
+
       private :coverage_file_class
 
       def directory_path
         is_path_valid = !output_directory.nil? && !output_directory.strip.eql?("")
         is_path_valid ? File.expand_path(output_directory) : "html"
       end
+
       private :directory_path
 
       def post
@@ -70,24 +71,27 @@ module Slather
 
         total_relevant_lines = 0
         total_tested_lines = 0
+        total_excluded_lines = 0
+
         coverage_files.each { |coverage_file|
           total_tested_lines += coverage_file.num_lines_tested
           total_relevant_lines += coverage_file.num_lines_testable
+          total_excluded_lines += coverage_file.num_lines_excluded
         }
 
-        builder = Nokogiri::HTML::Builder.with(template.at('#reports')) { |cov|
+        builder = Nokogiri::HTML::Builder.with(template.at("#reports")) { |cov|
           cov.h2 "Files for \"#{project_name}\""
 
           cov.h4 {
             percentage = (total_tested_lines / total_relevant_lines.to_f) * 100.0
             cov.span "Total Coverage : "
-            cov.span decimal_f(percentage) + '%', :class => class_for_coverage_percentage(percentage), :id => "total_coverage"
+            cov.span decimal_f(percentage) + "%", :class => class_for_coverage_percentage(percentage), :id => "total_coverage"
+            cov.span "Total excluded lines : #{total_excluded_lines}"
           }
 
           cov.input(:class => "search", :placeholder => "Search")
 
-          cov.table(:class => "coverage_list", :cellspacing => 0,  :cellpadding => 0) {
-
+          cov.table(:class => "coverage_list", :cellspacing => 0, :cellpadding => 0) {
             cov.thead {
               cov.tr {
                 cov.th "%", :class => "col_num sort", "data-sort" => "data_percentage"
@@ -139,13 +143,13 @@ module Slather
 
         template = generate_html_template(filename, false, is_file_empty)
 
-        builder = Nokogiri::HTML::Builder.with(template.at('#reports')) { |cov|
+        builder = Nokogiri::HTML::Builder.with(template.at("#reports")) { |cov|
           cov.h2(:class => "cov_title") {
             cov.span("Coverage for \"#{filename}\"" + (!is_file_empty ? " : " : ""))
             cov.span("#{decimal_f(percentage)}%", :class => class_for_coverage_percentage(percentage)) unless is_file_empty
           }
 
-          cov.h4("(#{coverage_file.num_lines_tested} of #{coverage_file.num_lines_testable} relevant lines covered)", :class => "cov_subtitle")
+          cov.h4("(#{coverage_file.num_lines_tested} of #{coverage_file.num_lines_testable} relevant lines covered, #{coverage_file.num_lines_excluded} lines excluded)", :class => "cov_subtitle")
           cov.h4(filepath, :class => "cov_filepath")
 
           if is_file_empty
@@ -157,15 +161,19 @@ module Slather
 
           cov.table(:class => "source_code") {
             cleaned_gcov_lines.each do |line|
-
               line_number = coverage_file.line_number_in_line(line)
               next unless line_number > 0
 
+              exluded = coverage_file.excluded_lines[line_number]
               line_source = line.split(line_number_separator, 3)[2]
-              line_data = [line_number, line_source, hits_for_coverage_line(coverage_file, line)]
+              if exluded
+                line_data = [line_number, line_source, "🙈"]
+              else
+                line_data = [line_number, line_source, hits_for_coverage_line(coverage_file, line)]
+              end
               classes = ["num", "src", "coverage"]
 
-              cov.tr(:class => class_for_coverage_line(coverage_file,line)) {
+              cov.tr(:class => class_for_coverage_line(coverage_file, line)) {
                 line_data.each_with_index { |line, idx|
                   if idx != 1
                     cov.td(line, :class => classes[idx])
@@ -253,7 +261,6 @@ module Slather
         else "cov_low"
         end
       end
-
     end
   end
 end
